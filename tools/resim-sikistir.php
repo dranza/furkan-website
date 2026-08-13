@@ -1,0 +1,44 @@
+<?php
+require_once __DIR__ . '/../app/models/Settings.php';
+require_once __DIR__ . '/../app/models/Tool.php';
+
+$pageTitle = 'Resim Sıkıştır / Dönüştür';
+$pageDesc  = 'JPG/PNG/WebP görselleri tarayıcıda sıkıştır ve format dönüştür. Çoklu dosya ve kalite kontrolü.';
+
+Tool::ensure('img_compress', 'Resim Sıkıştır / Dönüştür');
+$tool = Tool::get('img_compress') ?? ['status'=>'active','meta'=>[]];
+$toolStatus = (string)($tool['status'] ?? 'active');
+$toolMeta = (array)($tool['meta'] ?? []);
+$toolMsg = (string)($toolMeta['maintenance_message'] ?? 'Bu araç şu an bakımda. Lütfen daha sonra tekrar deneyin.');
+$toolMessage = $toolMsg;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  header('Content-Type: application/json; charset=utf-8');
+  try {
+    $tNow = Tool::get('img_compress');
+    if ($tNow && ($tNow['status'] ?? 'active') !== 'active') {
+      http_response_code(403);
+      echo json_encode(['ok'=>false,'error'=>'Tool disabled']);
+      exit;
+    }
+    $raw = file_get_contents('php://input');
+    $data = json_decode($raw ?: '{}', true);
+    $files = (int)($data['files'] ?? 1);
+    if ($files < 1) $files = 1;
+    if ($files > 300) $files = 300;
+    Tool::recordUse('img_compress', 1, $files);
+    echo json_encode(['ok'=>true]);
+  } catch (Throwable $t) {
+    http_response_code(200);
+    echo json_encode(['ok'=>false]);
+  }
+  exit;
+}
+
+if ($toolStatus !== 'active') {
+  $error = ($toolStatus === 'maintenance') ? $toolMsg : 'Bu araç şu an pasif.';
+  render('tools_img_compress', compact('pageTitle','pageDesc','error'));
+  return;
+}
+
+render('tools_img_compress', compact('pageTitle','pageDesc','toolStatus','toolMessage'));
